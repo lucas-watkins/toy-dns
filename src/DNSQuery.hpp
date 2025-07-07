@@ -29,6 +29,8 @@ class DNSQuery {
     std::string _name {};
     RecordType _record_type {};
 
+    [[nodiscard]] std::string build_query() const;
+
 
 public:
     DNSQuery(const std::uint16_t id, const Opcode opcode) : _id{id}, _opcode{opcode} {
@@ -39,10 +41,8 @@ public:
     [[nodiscard]] Opcode opcode() const;
     void recursive(bool recursive);
     void record_type(RecordType);
-    void name(std::string);
-    void send(std::string_view addr);
-
-    friend void send_packet(const DNSQuery &);
+    void name(const std::string &);
+    void send(std::string_view addr) const;
 };
 
 void push_16_t(std::stringstream &, std::uint16_t num);

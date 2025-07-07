@@ -16,13 +16,13 @@
  * https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml
  */
 enum class Opcode : std::uint16_t {
-    StandardQuery = 0,
-    IQuery        = 1,
-    Status        = 2,
-    Unassigned    = 3,
-    Notify        = 4,
-    Update        = 5,
-    DSO           = 6,
+    StandardQuery = 0b0000000000000000,
+    IQuery        = 0b0000100000000000,
+    Status        = 0b0001000000000000,
+    Unassigned    = 0b0001100000000000,
+    Notify        = 0b0010000000000000,
+    Update        = 0b0010100000000000,
+    DSO           = 0b0011000000000000,
 };
 
 #endif //DNSOPCODES_HPP

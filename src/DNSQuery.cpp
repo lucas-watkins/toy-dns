@@ -36,8 +36,8 @@ void DNSQuery::record_type(const RecordType r) {
     _record_type = r;
 }
 
-void DNSQuery::name(std::string name) {
-    _name = std::move(name);
+void DNSQuery::name(const std::string &name) {
+    _name = name;
 }
 
 void push_16_t(std::stringstream &os, const std::uint16_t num) {
@@ -48,21 +48,9 @@ void push_16_t(std::stringstream &os, const std::uint16_t num) {
     os << high << low;
 }
 
-void DNSQuery::send(std::string_view addr) {
-    int sock = socket(AF_INET, SOCK_DGRAM, 0);
-
-    sockaddr_in address {};
-    address.sin_family = AF_INET;
-    address.sin_port = htons(53);
-    address.sin_addr.s_addr = inet_addr(addr.data());
-
-    // No blocking
-    //fcntl(sock, F_SETFL, fcntl(sock, F_GETFL) | O_NONBLOCK);
-
-    connect(sock, reinterpret_cast<sockaddr *>(&address), sizeof(address));
-
+std::string DNSQuery::build_query() const {
     std::stringstream stream;
-    //stream << std::hex << std::setfill('0') << std::setw(4);
+
     push_16_t(stream, _id);
     push_16_t(stream, _flags);
     push_16_t(stream, 1); // Question Count
@@ -70,31 +58,49 @@ void DNSQuery::send(std::string_view addr) {
     push_16_t(stream, 0); // NSCOUNT
     push_16_t(stream, 0); // ARCOUNT
 
-    size_t pos;
+    std::vector<std::string> tokens;
+    std::string token;
 
-    // add input validation here
+    for (auto iter = _name.begin(); iter != _name.end(); std::advance(iter, 1)) {
+        if (*iter == '.') {
+            tokens.push_back(token);
+            token.clear();
+        } else if (_name.end() - iter == 1) { // last item
+            token += *iter;
+            tokens.push_back(token);
+        }
+        else {
+            token += *iter;
+        }
+    }
 
-    // copy to prevent modifying real string
-    std::string name {_name + '.'};
-
-    while ((pos = name.find('.')) != std::string::npos) {
-        std::string token = name.substr(0, pos);
-        assert(token.size() <= 255); // Max token length as length param is 1 byte
-
-        stream << static_cast<char>(token.size());
-        stream << token;
-
-        name.erase(0, pos + 1);
+    for (const auto &t : tokens) {
+        stream << static_cast<char>(t.size()) << t;
     }
 
     stream << static_cast<char>(0);  // Null terminating character
     push_16_t(stream, static_cast<std::uint16_t>(_record_type));
     push_16_t(stream, 1); //Query is class in
 
-    const std::string data {stream.str()};
+    return stream.str();
+}
+
+void DNSQuery::send(const std::string_view addr) const {
+    const int sock = socket(AF_INET, SOCK_DGRAM, 0);
+
+    sockaddr_in address {};
+    address.sin_family = AF_INET;
+    address.sin_port = htons(53);
+    address.sin_addr.s_addr = inet_addr(addr.data());
+
+    if (connect(sock, reinterpret_cast<sockaddr *>(&address), sizeof(address))) {
+        throw std::runtime_error("DNSQuery::send [connect failed]");
+    }
+
+    const std::string data {build_query()};
     const char *pbuf = data.c_str();
 
-    ssize_t buflen (data.size());
+    size_t buflen {data.size()};
 
     while (buflen > 0) {
         ssize_t num_bytes = ::send(sock, pbuf, buflen, 0);
@@ -105,16 +111,14 @@ void DNSQuery::send(std::string_view addr) {
 
 
     std::vector<unsigned char> buffer(BUFSIZ); // Max packet size
-    ssize_t bytes_to_read {recv(sock, &buffer[0], buffer.size(), MSG_PEEK)};
-    ssize_t packet_size {bytes_to_read};
+    const ssize_t packet_size {recv(sock, &buffer[0], buffer.size(), MSG_PEEK)};
 
-    std::cout << "To Read: " << bytes_to_read << std::endl;
+    std::cout << "To Read: " << packet_size << std::endl;
 
-    do {
-        ssize_t num_bytes = recv(sock, &buffer[0], buffer.size(), MSG_PEEK);
-        std::cout << "Received: " << num_bytes << std::endl;
-        bytes_to_read -= num_bytes;
-    } while (bytes_to_read > 0);
+    // recv consumes one datagram regardless if it is truncated
+    const ssize_t num_bytes = recv(sock, &buffer[0], buffer.size(), MSG_PEEK);
+    std::cout << "Received: " << num_bytes << std::endl;
+
 
     std::cout << "DONE" << std::endl;
 
