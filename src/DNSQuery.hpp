@@ -2,8 +2,8 @@
 // Created by Lucas Watkins on 7/1/25.
 //
 
-#ifndef DNSPACKET_HPP
-#define DNSPACKET_HPP
+#ifndef DNSQUERY_HPP
+#define DNSQUERY_HPP
 
 #include <cstdint>
 #include <format>
@@ -16,35 +16,44 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <arpa/inet.h>
-#include "Opcode.hpp"
-#include "RecordType.hpp"
+#include "DNSRecord_t.hpp"
 #include <type_traits>
 #include <fcntl.h>
 #include <sys/ioctl.h>
 
-class DNSQuery {
-    std::uint16_t _id {0};
-    std::uint16_t _flags {0};
-    Opcode _opcode;
-    std::string _name {};
-    RecordType _record_type {};
+#include "DNSPacket.hpp"
 
+class DNSQuery : public DNSPacket {
     [[nodiscard]] std::string build_query() const;
 
-
 public:
-    DNSQuery(const std::uint16_t id, const Opcode opcode) : _id{id}, _opcode{opcode} {
-        _flags = static_cast<std::uint16_t>(opcode);
+    DNSQuery(const std::uint16_t id, const std::string& name, const DNSRecord query_type) : DNSPacket{
+        id, name, query_type
+    } {
+        recursive(true);
     }
 
-    [[nodiscard]] std::uint8_t flags() const;
-    [[nodiscard]] Opcode opcode() const;
-    void recursive(bool recursive);
-    void record_type(RecordType);
-    void name(const std::string &);
+    DNSQuery& recursive(bool recursive);
+
+    //bool recursive() const {return };
+
+    DNSQuery& query_type(const DNSRecord r) {
+        _query_type = r;
+        return *this;
+    }
+
+    // cppcheck-suppress duplInheritedMember
+    [[nodiscard]] DNSRecord query_type() const { return DNSPacket::query_type(); }
+
+    DNSQuery& name(const std::string& name) {
+        _name = name;
+        return *this;
+    }
+
+    // cppcheck-suppress duplInheritedMember
+    [[nodiscard]] const std::string& name() const { return DNSPacket::name(); }
+
     void send(std::string_view addr) const;
 };
 
-void push_16_t(std::stringstream &, std::uint16_t num);
-
-#endif //DNSPACKET_HPP
+#endif // DNSQUERY_HPP

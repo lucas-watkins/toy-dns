@@ -1,12 +1,10 @@
 #include <iostream>
+#include "DNSRecord_t.hpp"
 #include "DNSQuery.hpp"
 
 int main() {
-    DNSQuery packet{56130, Opcode::StandardQuery};
+    constexpr std::string name_to_lookup {"google.com"};
 
-    packet.recursive(true);
-    packet.record_type(RecordType::A);
-    packet.name("lucaspowered.com");
-
-    packet.send("1.1.1.1");
+    const DNSQuery packet{56130, name_to_lookup, DNSRecord::A};
+    packet.send("8.8.8.8");
 }
