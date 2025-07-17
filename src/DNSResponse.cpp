@@ -4,26 +4,21 @@
 
 #include "DNSResponse.hpp"
 
-/*
- * Gets 16-bit integer from a DNSResponse provided a start index and DNSResponse
- */
-static std::uint16_t get_16_t_from_resp(const RawDNSResponse &r, const std::size_t start_idx) {
-    if (start_idx >= r.size() - 1) {
-        throw std::invalid_argument("get_16_t_from_str() start_idx >= last index of str");
+template <typename T> requires std::is_arithmetic_v<T> && std::is_unsigned_v<T>
+static T get_uintn_t_from_resp(const RawDNSResponse &r, std::size_t start_idx) {
+
+    if (start_idx >= r.size() - sizeof(T)) {
+        throw std::invalid_argument("get_n_bits_from_resp start_idx >= last index of str");
     }
 
-    return r[start_idx] << 8 | r[start_idx + 1];
-}
+    T result {0};
 
-/*
- * Gets 32-bit integer from DNSResponse provided a start index and a DNSResponse
- */
-static std::uint32_t get_32_t_from_resp(const RawDNSResponse &r, const std::size_t start_idx) {
-    if (start_idx >= r.size() - 4) {
-        throw std::invalid_argument("get_32_from_str() start_idx >= last index of str");
+    for (unsigned num_bits {sizeof(T) * 8}; num_bits >= 8; num_bits -= 8 ) {
+        result |= r[start_idx] << (num_bits - 8);
+        start_idx++;
     }
 
-    return get_16_t_from_resp(r, start_idx) << 16 | get_16_t_from_resp(r, start_idx + 2);
+    return result;
 }
 
 static std::string get_ip_from_32_t(const std::uint32_t ip) {
@@ -49,33 +44,30 @@ static std::string get_ip_from_32_t(const std::uint32_t ip) {
  */
 
 DNSResponse::DNSResponse(const DNSPacket &p, const RawDNSResponse &data, const ssize_t ans_size) :
-             DNSPacket{p}, _ans_count{get_16_t_from_resp(data, 6)}, _ans_size {ans_size} {
+             DNSPacket{p}, _ans_count{get_uintn_t_from_resp<std::uint16_t>(data, 6)}, _ans_size {ans_size} {
 
-    _flags = get_16_t_from_resp(data, 2); // update flags since they change in response
+    _flags = get_uintn_t_from_resp<std::uint16_t>(data, 2); // update flags since they change in response
 
     // marker for where first response starts (and updated to count each response)
     std::size_t offset { 13 + _name.size() + 5 };
 
    while (offset < _ans_size) {
-       const DNSRecord record_type { get_16_t_from_resp(data, offset + 2) };
+       const DNSRecord record_type { get_uintn_t_from_resp<std::uint16_t>(data, offset + 2) };
 
        if (record_type == DNSRecord::A) {
-           _answers.push_back(
-               ARecord {
-                   DNSRecord_t {
-                       .data = RawDNSResponse(
-                            data.begin() + static_cast<ssize_t>(offset),
-                            data.begin() + static_cast<ssize_t>(offset) + 16
-                           )
-                   },
-                   get_ip_from_32_t(get_32_t_from_resp(data, offset + 12)),
-                   get_32_t_from_resp(data, offset + 6),
-               }
-           );
+           _answers.emplace_back(
+               std::make_shared<ARecord> (
+                   RawDNSResponse(
+                       data.begin() + static_cast<ssize_t>(offset),
+                       data.begin() + static_cast<ssize_t>(offset) + 1
+                       ),
+                       get_ip_from_32_t(get_uintn_t_from_resp<std::uint32_t>(data, offset + 12)),
+                    get_uintn_t_from_resp<std::uint32_t>(data, offset + 6)
+                )
+            );
            offset += 16; // An A record is 16 bytes
        } else if (record_type == DNSRecord::AAAA) {
 
        }
    }
-
 }

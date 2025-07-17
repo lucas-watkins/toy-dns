@@ -22,6 +22,7 @@
 #include <sys/ioctl.h>
 
 #include "DNSPacket.hpp"
+#include "DNSResponse.hpp"
 
 class DNSQuery : public DNSPacket {
     [[nodiscard]] std::string build_query() const;
@@ -53,7 +54,7 @@ public:
     // cppcheck-suppress duplInheritedMember
     [[nodiscard]] const std::string& name() const { return DNSPacket::name(); }
 
-    void send(std::string_view addr) const;
+    [[nodiscard]] DNSResponse send(std::string_view addr) const;
 };
 
 #endif // DNSQUERY_HPP

@@ -3,7 +3,6 @@
 //
 
 #include "DNSQuery.hpp"
-
 #include "DNSResponse.hpp"
 
 /*
@@ -83,7 +82,7 @@ std::string DNSQuery::build_query() const {
 /*
  * Sends the DNS query and captures a response. For now, it prints the raw packet to stdout
  */
-void DNSQuery::send(const std::string_view addr) const {
+DNSResponse DNSQuery::send(const std::string_view addr) const {
     const int sock = socket(AF_INET, SOCK_DGRAM, 0);
 
     sockaddr_in address{};
@@ -102,7 +101,6 @@ void DNSQuery::send(const std::string_view addr) const {
 
     while (buflen > 0) {
         const ssize_t num_bytes = ::send(sock, pbuf, buflen, 0);
-        std::cout << "Sent: " << num_bytes << std::endl;
         pbuf += num_bytes;
         buflen -= num_bytes;
     }
@@ -117,8 +115,7 @@ void DNSQuery::send(const std::string_view addr) const {
 
     assert(packet_size == num_bytes && "Unable to receive full DNS response");
 
-    const DNSResponse response{*this, buffer, packet_size};
-    std::cout << response << std::endl;
-
     close(sock);
+
+    return DNSResponse {*this, buffer, packet_size};
 }

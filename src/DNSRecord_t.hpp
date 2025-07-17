@@ -8,20 +8,35 @@
 #include <string>
 #include <cstdint>
 #include <iostream>
+#include <type_traits>
+#include <utility>
+#include <netinet/in.h>
 
 using RawDNSResponse = std::vector<std::uint8_t>;
 
 struct DNSRecord_t {
     const RawDNSResponse data; // Raw data as chars
+
+    explicit DNSRecord_t(RawDNSResponse data) : data(std::move(data)) {}
+    virtual ~DNSRecord_t() = default;
 };
 
 struct CNAMERecord final : public DNSRecord_t {
     const std::string name;
+
+    CNAMERecord(RawDNSResponse data, std::string name) :
+        DNSRecord_t{std::move(data)},
+        name{std::move(name)} {}
 };
 
 struct ARecord final : public DNSRecord_t {
     const std::string ip_addr;
     const std::uint32_t ttl; // How long is response valid?
+
+    ARecord(RawDNSResponse data, std::string ip_addr, const std::uint32_t ttl) :
+        DNSRecord_t{std::move(data)},
+        ip_addr{std::move(ip_addr)},
+        ttl{ttl} {}
 };
 
 typedef ARecord AAAARecord; // AAAA Record has a 128-bit ipv6 address
