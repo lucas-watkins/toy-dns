@@ -7,7 +7,7 @@
 
 #include "DNSPacket.hpp"
 #include <sstream>
-#include "DNSRecord_t.hpp"
+#include "BaseDNSRecord.hpp"
 #include <memory>
 
 
@@ -15,13 +15,13 @@ class DNSResponse : public DNSPacket {
 
     std::uint16_t _ans_count;
     ssize_t _ans_size;
-    std::vector<std::shared_ptr<DNSRecord_t>> _answers {};
+    std::vector<std::shared_ptr<BaseDNSRecord>> _answers {};
 
 
 public:
     DNSResponse(const DNSPacket &, const RawDNSResponse &, ssize_t);
 
-    template <typename T> requires std::is_base_of_v<DNSRecord_t, T>
+    template <typename T> requires std::is_base_of_v<BaseDNSRecord, T>
     [[nodiscard]] std::vector<T> get_records() const {
         std::vector<T> records;
         for (const auto &r : _answers) {

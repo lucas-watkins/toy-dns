@@ -16,7 +16,7 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <arpa/inet.h>
-#include "DNSRecord_t.hpp"
+#include "BaseDNSRecord.hpp"
 #include <type_traits>
 #include <fcntl.h>
 #include <sys/ioctl.h>

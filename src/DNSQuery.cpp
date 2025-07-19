@@ -90,14 +90,17 @@ DNSResponse DNSQuery::send(const std::string_view addr) const {
     address.sin_port = htons(53);
     address.sin_addr.s_addr = inet_addr(addr.data());
 
-    if (connect(sock, reinterpret_cast<sockaddr *>(&address), sizeof(address))) {
-        throw std::runtime_error("DNSQuery::send [connect failed]");
-    }
+    const std::string data{std::move(build_query())};
 
-    const std::string data{build_query()};
     const char* pbuf = data.c_str();
 
     size_t buflen{data.size()};
+
+    std::vector<std::uint8_t> resp_buffer(BUFSIZ); // Max packet size
+
+    if (connect(sock, reinterpret_cast<sockaddr *>(&address), sizeof(address))) {
+        throw std::runtime_error("DNSQuery::send [connect failed]");
+    }
 
     while (buflen > 0) {
         const ssize_t num_bytes = ::send(sock, pbuf, buflen, 0);
@@ -105,17 +108,15 @@ DNSResponse DNSQuery::send(const std::string_view addr) const {
         buflen -= num_bytes;
     }
 
-
-    std::vector<std::uint8_t> buffer(BUFSIZ); // Max packet size
-
-    const ssize_t packet_size{recv(sock, &buffer[0], buffer.size(), MSG_PEEK)};
+    const ssize_t packet_size{recv(sock, &resp_buffer[0], resp_buffer.size(), MSG_PEEK)};
 
     // recv consumes one datagram regardless if it is truncated
-    const ssize_t num_bytes{recv(sock, &buffer[0], buffer.size(), MSG_PEEK)};
+    const ssize_t num_bytes{recv(sock, &resp_buffer[0], resp_buffer.size(), MSG_PEEK)};
 
-    assert(packet_size == num_bytes && "Unable to receive full DNS response");
+    if (packet_size != num_bytes || num_bytes <= 0)
+        throw std::runtime_error("DNSQuery::send [unable to receive full response]");
 
     close(sock);
 
-    return DNSResponse {*this, buffer, packet_size};
+    return DNSResponse {*this, resp_buffer, packet_size};
 }

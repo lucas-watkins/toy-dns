@@ -8,7 +8,7 @@
 #include <cstdint>
 #include <utility>
 #include <vector>
-#include "DNSRecord_t.hpp"
+#include "BaseDNSRecord.hpp"
 
 /*
  * Base class for a DNSQuery or DNSResponse. If left unchanged in either class,

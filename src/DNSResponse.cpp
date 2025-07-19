@@ -13,22 +13,56 @@ static T get_uintn_t_from_resp(const RawDNSResponse &r, std::size_t start_idx) {
 
     T result {0};
 
-    for (unsigned num_bits {sizeof(T) * 8}; num_bits >= 8; num_bits -= 8 ) {
-        result |= r[start_idx] << (num_bits - 8);
+    for (int shift {(sizeof(T) - 1) * 8}; shift >= 0; shift -= 8 ) {
+        result |= r[start_idx] << shift;
         start_idx++;
     }
 
     return result;
 }
 
-static std::string get_ip_from_32_t(const std::uint32_t ip) {
+std::string get_ipv4_from_resp(const RawDNSResponse &r, const ssize_t start_idx) {
     std::stringstream ss;
 
-    for (int shift {24}; shift >= 0; shift -= 8) {
-        ss << (ip >> shift & 0xFF);
+    const auto end { r.begin() + start_idx + 3 };
 
-        if (shift > 0)
+    for (auto iter { r.begin() + start_idx }; iter <= end; ++iter) {
+        ss << static_cast<std::uint16_t>(*iter);
+
+        if (iter != end)
             ss << '.';
+    }
+
+    return ss.str();
+}
+
+std::string get_ipv6_from_resp(const RawDNSResponse &r, const ssize_t start_idx) {
+
+    std::stringstream ss;
+
+    ss << std::hex;
+
+    const auto end { r.begin() + start_idx + 15 };
+
+    bool skip { false };
+
+    for (auto iter {r.begin() + start_idx}; iter <= end; std::advance(iter, 2)) {
+
+        const auto token { static_cast<std::uint16_t>((*iter << 8) + *std::next(iter)) };
+
+        if (token > 0) {
+            ss << token;
+
+            if (iter + 1 < end)
+                ss << ':';
+
+            skip = false;
+        } else {
+            if (!skip && iter + 1 < end)
+                ss << ':';
+
+            skip = true;
+        }
     }
 
     return ss.str();
@@ -49,25 +83,43 @@ DNSResponse::DNSResponse(const DNSPacket &p, const RawDNSResponse &data, const s
     _flags = get_uintn_t_from_resp<std::uint16_t>(data, 2); // update flags since they change in response
 
     // marker for where first response starts (and updated to count each response)
-    std::size_t offset { 13 + _name.size() + 5 };
+    ssize_t offset { static_cast<ssize_t>(13 + _name.size() + 5) };
 
    while (offset < _ans_size) {
        const DNSRecord record_type { get_uintn_t_from_resp<std::uint16_t>(data, offset + 2) };
+       if (record_type == DNSRecord::SOA)
+           throw std::ios_base::failure("IP Address Not Found");
 
        if (record_type == DNSRecord::A) {
-           _answers.emplace_back(
+           _answers.push_back(
                std::make_shared<ARecord> (
                    RawDNSResponse(
-                       data.begin() + static_cast<ssize_t>(offset),
-                       data.begin() + static_cast<ssize_t>(offset) + 1
+                       data.begin() + offset,
+                       data.begin() + offset + 16
                        ),
-                       get_ip_from_32_t(get_uintn_t_from_resp<std::uint32_t>(data, offset + 12)),
+                       get_ipv4_from_resp(data, offset + 12),
                     get_uintn_t_from_resp<std::uint32_t>(data, offset + 6)
                 )
             );
            offset += 16; // An A record is 16 bytes
-       } else if (record_type == DNSRecord::AAAA) {
 
+       } else if (record_type == DNSRecord::AAAA) {
+           _answers.push_back(
+              std::make_shared<AAAARecord> (
+                  RawDNSResponse(
+                      data.begin() + offset,
+                      data.begin() + offset + 28
+                      ),
+
+               get_ipv6_from_resp(data, offset + 12),
+                   get_uintn_t_from_resp<std::uint32_t>(data, offset + 6)
+               )
+           );
+           offset += 28;
+       } else {
+           const std::uint16_t len { get_uintn_t_from_resp<std::uint16_t>(data,offset + 10) };
+
+           offset += 12 + len;
        }
    }
 }
