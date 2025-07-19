@@ -1,4 +1,3 @@
-#include <cassert>
 #include <iostream>
 #include "BaseDNSRecord.hpp"
 #include "DNSQuery.hpp"
