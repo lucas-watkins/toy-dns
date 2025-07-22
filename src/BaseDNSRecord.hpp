@@ -6,6 +6,7 @@
 #define DNSRECORD_HPP
 
 #include <vector>
+#include <cstdint>
 
 using RawDNSResponse = std::vector<std::uint8_t>;
 struct BaseDNSRecord;
@@ -28,9 +29,9 @@ struct BaseDNSRecord;
 #include <netinet/in.h>
 
 struct BaseDNSRecord {
-    const RawDNSResponse data; // Raw data as chars
+    const RawDNSResponse _data; // Raw data as chars
 
-    explicit BaseDNSRecord(RawDNSResponse data) : data(std::move(data)) {}
+    explicit BaseDNSRecord(RawDNSResponse data) : _data(std::move(data)) {}
     virtual ~BaseDNSRecord() = default;
 };
 
