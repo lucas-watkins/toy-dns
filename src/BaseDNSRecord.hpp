@@ -5,6 +5,8 @@
 #ifndef DNSRECORD_HPP
 #define DNSRECORD_HPP
 
+#include <vector>
+
 using RawDNSResponse = std::vector<std::uint8_t>;
 struct BaseDNSRecord;
 
