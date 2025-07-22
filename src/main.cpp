@@ -4,7 +4,7 @@
 
 int main() {
 
-    constexpr std::string name_to_lookup { "lucaspowered.com" };
+    const std::string name_to_lookup { "lucaspowered.com" };
 
     const DNSQuery packet{56130, name_to_lookup, DNSRecord::A};
 
